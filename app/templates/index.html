@@ -1,91 +1,118 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+    <meta charset="UTF-8">
     <title>AQI Predictor</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         body {
-            font-family: Arial, sans-serif;
+            font-family: 'Segoe UI', sans-serif;
             margin: 40px;
-            background-color: #f4f6f9;
-            color: #333;
+            background: #f8f9fa;
+            text-align: center;
         }
-    
-        h1 {
-            color: #2c3e50;
-            margin-bottom: 20px;
-        }
-    
-        form {
+        .form-container {
             margin-bottom: 30px;
         }
-    
         select, button {
-            padding: 8px 12px;
-            margin-right: 10px;
-            font-size: 16px;
-            border-radius: 5px;
+            padding: 10px 20px;
             border: 1px solid #ccc;
-        }
-    
-        button {
-            background-color: #3498db;
-            color: white;
-            border: none;
-            cursor: pointer;
-        }
-    
-        button:hover {
-            background-color: #2980b9;
-        }
-    
-        canvas {
-            background-color: #fff;
-            padding: 20px;
-            border: 1px solid #ddd;
             border-radius: 8px;
+            font-size: 16px;
+        }
+        .charts {
+            display: flex;
+            justify-content: center;
+            flex-wrap: wrap;
+            gap: 30px;
+        }
+        canvas {
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0px 0px 10px #ccc;
+        }
+        .aqi-result {
+            margin-top: 20px;
+            font-size: 18px;
+            background: #fff3cd;
+            padding: 15px;
+            border: 1px solid #ffeeba;
+            border-radius: 10px;
+            display: inline-block;
         }
     </style>
-    
 </head>
 <body>
-    <h1>AQI Predictor</h1>
+    <h1>Air Quality Index Dashboard</h1>
 
-    <form method="POST">
-        <label for="city">Select a city:</label>
-        <select name="city" id="city">
+    <form method="POST" class="form-container">
+        <select name="city" required>
+            <option value="" disabled selected>Select a city</option>
             {% for city in cities %}
                 <option value="{{ city }}" {% if city == selected_city %}selected{% endif %}>{{ city }}</option>
             {% endfor %}
         </select>
-        <button type="submit">Show AQI</button>
+        <button type="submit">Show Data</button>
+        {% if selected_city %}
+        <button type="submit" name="predict" value="true" style="background-color: green;">Predict AQI</button>
+        {% endif %}
     </form>
 
-    {% if selected_city %}
-        <h2>Showing AQI for: {{ selected_city }}</h2>
-        <canvas id="aqiChart" width="800" height="400"></canvas>
+    {% if predicted_aqi %}
+        <div class="aqi-result">
+            <strong>Predicted AQI:</strong> {{ predicted_aqi }}<br>
+            <strong>Bucket:</strong> {{ aqi_bucket }}
+        </div>
     {% endif %}
 
     {% if aqi_data %}
-    <script>
-        const aqiData = {{ aqi_data | tojson | safe }};
-        const labels = aqiData.map(d => d.Date);
-        const values = aqiData.map(d => d.AQI);
+    <div class="charts">
+        <div style="width: 600px;">
+            <h3>AQI Over Time</h3>
+            <canvas id="aqiChart"></canvas>
+        </div>
 
-        const ctx = document.getElementById("aqiChart").getContext("2d");
-        new Chart(ctx, {
-            type: "line",
+        {% if avg_pollutants %}
+        <div style="width: 600px;">
+            <h3>Average Pollutant Levels</h3>
+            <canvas id="pollutantChart"></canvas>
+        </div>
+        {% endif %}
+    </div>
+    {% endif %}
+
+    <script>
+        {% if aqi_data %}
+        const aqiCtx = document.getElementById('aqiChart').getContext('2d');
+        const aqiChart = new Chart(aqiCtx, {
+            type: 'line',
             data: {
-                labels: labels,
+                labels: {{ aqi_data | map(attribute='Date') | list | tojson }},
                 datasets: [{
-                    label: "AQI Over Time",
-                    data: values,
-                    borderColor: "rgba(75, 192, 192, 1)",
-                    borderWidth: 2
+                    label: 'AQI',
+                    data: {{ aqi_data | map(attribute='AQI') | list | tojson }},
+                    borderColor: 'blue',
+                    fill: false,
+                    tension: 0.3
+                }]
+            }
+        });
+        {% endif %}
+
+        {% if avg_pollutants %}
+        const pollutantCtx = document.getElementById('pollutantChart').getContext('2d');
+        const pollutantChart = new Chart(pollutantCtx, {
+            type: 'bar',
+            data: {
+                labels: {{ avg_pollutants.keys() | list | tojson }},
+                datasets: [{
+                    label: 'Avg Pollutant Level',
+                    data: {{ avg_pollutants.values() | list | tojson }},
+                    backgroundColor: 'rgba(255, 99, 132, 0.7)'
                 }]
             },
             options: {
-                responsive : true,
+                responsive: true,
                 scales: {
                     y: {
                         beginAtZero: true
@@ -93,7 +120,7 @@
                 }
             }
         });
+        {% endif %}
     </script>
-    {% endif %}
 </body>
 </html>
